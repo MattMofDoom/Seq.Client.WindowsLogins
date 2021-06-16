@@ -75,7 +75,8 @@ namespace Seq.Client.WindowsLogins
             try
             {
                 //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
-                if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 60 && !_eventList.Contains(args.Entry.Index))
+                if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 60 &&
+                    !_eventList.Contains(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
             catch (Exception ex)
@@ -86,13 +87,12 @@ namespace Seq.Client.WindowsLogins
 
         private static void HandleEventLogEntry(EventLogEntry entry, string logName)
         {
-            if (entry.EntryType != EventLogEntryType.SuccessAudit)
-                return;
-
-            if ((ushort) entry.InstanceId != 4624)
-                return;
-
+            //Ensure that we track events we've already seen
             _eventList.Add(entry.Index);
+
+            //This listener is only interested in successful logins
+            if (entry.EntryType != EventLogEntryType.SuccessAudit || (ushort) entry.InstanceId != 4624)
+                return;
 
             try
             {
@@ -101,6 +101,7 @@ namespace Seq.Client.WindowsLogins
                 var reader = new EventLogReader(query);
                 for (var logEntry = reader.ReadEvent(); logEntry != null; logEntry = reader.ReadEvent())
                 {
+                    //Get all the properties of interest for passing to Seq
                     var loginEventPropertySelector = new EventLogPropertySelector(new[]
                     {
                         "Event/EventData/Data[@Name='SubjectUserSid']",
@@ -128,9 +129,10 @@ namespace Seq.Client.WindowsLogins
 
                     var eventProperties = ((EventLogRecord) logEntry).GetPropertyValues(loginEventPropertySelector);
 
-                    //Only interactive users are of interest
+                    //Only interactive users are of interest - logonType 2 and 10. Some non-interactive services can launch processes with logontype 2 but can be filtered.
                     if (((uint) eventProperties[8] == 2 || (uint) eventProperties[8] == 10) &&
                         (string) eventProperties[18] != "-" &&
+                        //De-duplicate successful logins - 2 events can be passed, one with a null guid
                         eventProperties[12].ToString() != "00000000-0000-0000-0000-000000000000")
                         Log.Level(Extensions.MapLogLevel(entry.EntryType))
 #pragma warning disable 618

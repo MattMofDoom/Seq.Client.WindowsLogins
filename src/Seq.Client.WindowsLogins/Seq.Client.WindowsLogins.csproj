@@ -36,6 +36,7 @@
   <PropertyGroup>
     <StartupObject />
     <Authors>Matt Marlor</Authors>
+    <Version>1.0.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

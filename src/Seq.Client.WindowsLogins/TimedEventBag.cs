@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Timers;
 
+// ReSharper disable UnusedMember.Global
+
 namespace Seq.Client.WindowsLogins
 {
     public class TimedEventBag : IList<int>
