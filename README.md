@@ -2,7 +2,7 @@
 
 This is a fork of the [Seq.Client.EventLog](https://github.com/c0shea/Seq.Client.EventLog) app for [Seq](https://getseq.net/).
 
-This substantially modifies the client to service that looks for successful interactive user logins and raises a nicely formatted event with the data extracted as structured properties.
+This substantially modifies the client to a service that looks for successful interactive user logins and raises a nicely formatted event with the data extracted as structured properties.
 
 
 ## Get Started
