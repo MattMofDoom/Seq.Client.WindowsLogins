@@ -74,6 +74,7 @@ namespace Seq.Client.WindowsLogins
         {
             try
             {
+                //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
                 if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 60 && !_eventList.Contains(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
