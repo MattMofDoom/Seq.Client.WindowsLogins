@@ -1,4 +1,4 @@
-﻿namespace Seq.Client.EventLog
+﻿namespace Seq.Client.WindowsLogins
 {
     partial class ProjectInstaller
     {
@@ -39,9 +39,9 @@
             // 
             // serviceInstaller
             // 
-            this.serviceInstaller.Description = "Writes Windows Event Log entries to Seq";
-            this.serviceInstaller.DisplayName = "Seq.Client.EventLog";
-            this.serviceInstaller.ServiceName = "Seq.Client.EventLog";
+            this.serviceInstaller.Description = "Writes Windows Logins to Seq";
+            this.serviceInstaller.DisplayName = "Seq.Client.WindowsLogins";
+            this.serviceInstaller.ServiceName = "Seq.Client.WindowsLogins";
             this.serviceInstaller.StartType = System.ServiceProcess.ServiceStartMode.Automatic;
             // 
             // ProjectInstaller

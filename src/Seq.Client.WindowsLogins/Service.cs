@@ -1,12 +1,13 @@
 ﻿using System.ServiceProcess;
 
-namespace Seq.Client.EventLog
+namespace Seq.Client.WindowsLogins
 {
     public partial class Service : ServiceBase
     {
         private readonly EventLogClient _client = new EventLogClient();
 
         #region Windows Service Base
+
         public Service()
         {
             InitializeComponent();
@@ -16,11 +17,12 @@ namespace Seq.Client.EventLog
         {
             _client.Start();
         }
-        
+
         protected override void OnStop()
         {
             _client.Stop();
         }
+
         #endregion
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace Seq.Client.EventLog
+﻿namespace Seq.Client.WindowsLogins
 {
     partial class Service
     {
