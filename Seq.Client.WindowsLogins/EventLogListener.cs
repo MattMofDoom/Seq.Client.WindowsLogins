@@ -10,15 +10,30 @@ namespace Seq.Client.WindowsLogins
 {
     public class EventLogListener
     {
-        // ReSharper disable once FieldCanBeMadeReadOnly.Local
-        private static TimedEventBag _eventList = new TimedEventBag(60000, new TimeSpan(0, 10, 0));
-        private static Timer _eventListTimer;
+        private static Timer _heartbeatTimer;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
-        private const int Available = 0;
-        private const int Locked = 1;
-        private static int _heartbeatLockState;
+
+        public EventLogListener(int? eventListInterval = null, TimeSpan? expiry = null)
+        {
+            TimeSpan eventExpiryTime;
+            int eventListInterval1;
+            if (eventListInterval != null)
+                eventListInterval1 = (int) eventListInterval;
+            else
+                eventListInterval1 = 60000;
+
+            if (expiry != null)
+                eventExpiryTime = (TimeSpan) expiry;
+            else
+                eventExpiryTime = new TimeSpan(0, 10, 0);
+
+            EventList = new TimedEventBag(eventListInterval1, eventExpiryTime);
+        }
+
+        // ReSharper disable once FieldCanBeMadeReadOnly.Local
+        public static TimedEventBag EventList { get; private set; }
 
         public void Start(bool isInteractive)
         {
@@ -34,10 +49,10 @@ namespace Seq.Client.WindowsLogins
                 //Heartbeat timer that can be used to detect if the service is not running
                 if (isInteractive || Config.HeartbeatInterval <= 0) return;
                 //First heartbeat will be at a random interval between 2 and 10 seconds
-                _eventListTimer = new Timer {Interval = new Random().Next(2000, 10000)};
-                _eventListTimer.Elapsed += EventListStatus;
-                _eventListTimer.AutoReset = false;
-                _eventListTimer.Start();
+                _heartbeatTimer = new Timer {Interval = new Random().Next(2000, 10000)};
+                _heartbeatTimer.Elapsed += ServiceHeartbeat;
+                _heartbeatTimer.AutoReset = false;
+                _heartbeatTimer.Start();
             }
             catch (Exception ex)
             {
@@ -45,18 +60,19 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private static void EventListStatus(object sender, EventArgs e)
+        private static void ServiceHeartbeat(object sender, EventArgs e)
         {
             Log.Level(LurgLevel.Debug)
-                .AddProperty("ItemCount", _eventList.Count)
+                .AddProperty("ItemCount", EventList.Count)
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
-                .Add("{AppName:l} Heartbeat [{MachineName:l}] - Cache of timed event ids is at {ItemCount} items, Next Heartbeat at ~{NextTime:H:mm:ss tt}");
+                .Add(
+                    "{AppName:l} Heartbeat [{MachineName:l}] - Cache of timed event ids is at {ItemCount} items, Next Heartbeat at {NextTime:H:mm:ss tt}");
 
-            if (_eventListTimer.AutoReset) return;
+            if (_heartbeatTimer.AutoReset) return;
             //Set the timer to 10 minutes after initial heartbeat
-            _eventListTimer.AutoReset = true;
-            _eventListTimer.Interval = Config.HeartbeatInterval;
-            _eventListTimer.Start();
+            _heartbeatTimer.AutoReset = true;
+            _heartbeatTimer.Interval = Config.HeartbeatInterval;
+            _heartbeatTimer.Start();
         }
 
         private static EventLog OpenEventLog()
@@ -91,7 +107,7 @@ namespace Seq.Client.WindowsLogins
             {
                 //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
                 if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 60 &&
-                    !_eventList.Contains(args.Entry.Index))
+                    !EventBagHasEvent(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
             catch (Exception ex)
@@ -100,10 +116,10 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        public static void HandleEventLogEntry(EventLogEntry entry, string logName)
+        private static void HandleEventLogEntry(EventLogEntry entry, string logName)
         {
             //Ensure that we track events we've already seen
-            _eventList.Add(entry.Index);
+            EventList.Add(entry.Index);
 
             //This listener is only interested in successful logins
             if (entry.EntryType != EventLogEntryType.SuccessAudit || (ushort) entry.InstanceId != 4624)
@@ -195,6 +211,11 @@ namespace Seq.Client.WindowsLogins
             return (uint) eventProperties[8] != 2 && (uint) eventProperties[8] != 10 ||
                    (string) eventProperties[18] == "-" ||
                    eventProperties[12].ToString() == "00000000-0000-0000-0000-000000000000";
+        }
+
+        public static bool EventBagHasEvent(int index)
+        {
+            return EventList.Contains(index);
         }
     }
 }
