@@ -1,4 +1,5 @@
-﻿using System.Configuration;
+﻿using System;
+using System.Configuration;
 using System.IO;
 using System.Reflection;
 
@@ -12,6 +13,13 @@ namespace Seq.Client.WindowsLogins
             SeqServer = ConfigurationManager.AppSettings["LogSeqServer"];
             SeqApiKey = ConfigurationManager.AppSettings["LogSeqApiKey"];
             LogFolder = ConfigurationManager.AppSettings["LogFolder"];
+            HeartbeatInterval = GetInt(ConfigurationManager.AppSettings["HeartbeatInterval"]);
+
+            //Must be between 0 and 1 hour in seconds
+            if (HeartbeatInterval < 0 || HeartbeatInterval > 3600)
+                HeartbeatInterval = 600000;
+            else
+                HeartbeatInterval *= 1000;
 
             var isSuccess = true;
             try
@@ -50,5 +58,24 @@ namespace Seq.Client.WindowsLogins
         public static string SeqServer { get; }
         public static string SeqApiKey { get; }
         public static string LogFolder { get; }
+        public static int HeartbeatInterval { get; }
+
+        /// <summary>
+        ///     Convert the supplied <see cref="object" /> to an <see cref="int" />
+        ///     <para />
+        ///     This will filter out nulls that could otherwise cause exceptions
+        /// </summary>
+        /// <param name="sourceObject">An object that can be converted to an int</param>
+        /// <returns></returns>
+        private static int GetInt(object sourceObject)
+        {
+            var sourceString = string.Empty;
+
+            if (!Convert.IsDBNull(sourceObject)) sourceString = (string) sourceObject;
+
+            if (int.TryParse(sourceString, out var destInt)) return destInt;
+
+            return -1;
+        }
     }
 }

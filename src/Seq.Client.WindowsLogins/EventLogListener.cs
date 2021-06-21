@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
@@ -27,9 +28,12 @@ namespace Seq.Client.WindowsLogins
                 _eventLog.EnableRaisingEvents = true;
                 _started = true;
 
-                if (!isInteractive) return;
-                _eventListTimer = new Timer {Interval = 60000};
+                //Heartbeat timer that can be used to detect if the service is not running
+                if (isInteractive || Config.HeartbeatInterval <= 0) return;
+                //First heartbeat will be at a random interval between 2 and 10 seconds
+                _eventListTimer = new Timer {Interval = new Random().Next(2000, 10000)};
                 _eventListTimer.Elapsed += EventListStatus;
+                _eventListTimer.AutoReset = false;
                 _eventListTimer.Start();
             }
             catch (Exception ex)
@@ -40,8 +44,16 @@ namespace Seq.Client.WindowsLogins
 
         private static void EventListStatus(object sender, EventArgs e)
         {
-            if (_eventList.Count > 0)
-                Log.Level(LurgLevel.Debug).Add("Cache of timed event ids is at {ItemCount} items", _eventList.Count);
+            if (_eventListTimer.AutoReset == false)
+            {
+                //Set the timer to 10 minutes after initial heartbeat
+                _eventListTimer.AutoReset = true;
+                _eventListTimer.Interval = Config.HeartbeatInterval;
+                _eventListTimer.Start();
+            }
+
+            Log.Level(LurgLevel.Debug).Add("{AppName} Heartbeat - Cache of timed event ids is at {ItemCount} items",
+                Logging.Config.AppName, _eventList.Count);
         }
 
         private static EventLog OpenEventLog()
@@ -85,7 +97,7 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private static void HandleEventLogEntry(EventLogEntry entry, string logName)
+        public static void HandleEventLogEntry(EventLogEntry entry, string logName)
         {
             //Ensure that we track events we've already seen
             _eventList.Add(entry.Index);
@@ -99,6 +111,7 @@ namespace Seq.Client.WindowsLogins
                 var query = new EventLogQuery(logName, PathType.LogName,
                     "*[System[(EventRecordID=" + entry.Index + ")]]");
                 var reader = new EventLogReader(query);
+
                 for (var logEntry = reader.ReadEvent(); logEntry != null; logEntry = reader.ReadEvent())
                 {
                     //Get all the properties of interest for passing to Seq
@@ -129,51 +142,56 @@ namespace Seq.Client.WindowsLogins
 
                     var eventProperties = ((EventLogRecord) logEntry).GetPropertyValues(loginEventPropertySelector);
 
-                    //Only interactive users are of interest - logonType 2 and 10. Some non-interactive services can launch processes with logontype 2 but can be filtered.
-                    if (((uint) eventProperties[8] == 2 || (uint) eventProperties[8] == 10) &&
-                        (string) eventProperties[18] != "-" &&
-                        //De-duplicate successful logins - 2 events can be passed, one with a null guid
-                        eventProperties[12].ToString() != "00000000-0000-0000-0000-000000000000")
-                        Log.Level(Extensions.MapLogLevel(entry.EntryType))
+                    if (IsNotValid(eventProperties)) continue;
+
+                    Log.Level(Extensions.MapLogLevel(entry.EntryType))
 #pragma warning disable 618
-                            .AddProperty("EventId", entry.EventID)
+                        .AddProperty("EventId", entry.EventID)
 #pragma warning restore 618
-                            .AddProperty("InstanceId", entry.InstanceId)
-                            .AddProperty("EventTime", entry.TimeGenerated)
-                            .AddProperty("Source", entry.Source)
-                            .AddProperty("Category", entry.CategoryNumber)
-                            .AddProperty("EventLogName", logName)
-                            .AddProperty("EventRecordID", entry.Index)
-                            .AddProperty("Details", entry.Message)
-                            .AddProperty("SubjectUserSid", eventProperties[0])
-                            .AddProperty("SubjectUserName", eventProperties[1])
-                            .AddProperty("SubjectDomainName", eventProperties[2])
-                            .AddProperty("SubjectLogonId", eventProperties[3])
-                            .AddProperty("TargetUserSid", eventProperties[4])
-                            .AddProperty("TargetUserName", eventProperties[5])
-                            .AddProperty("TargetDomainName", eventProperties[6])
-                            .AddProperty("TargetLogonId", eventProperties[7])
-                            .AddProperty("LogonType", eventProperties[8])
-                            .AddProperty("LogonProcessName", eventProperties[9])
-                            .AddProperty("AuthenticationPackageName", eventProperties[10])
-                            .AddProperty("WorkstationName", eventProperties[11])
-                            .AddProperty("LogonGuid", eventProperties[12])
-                            .AddProperty("TransmittedServices", eventProperties[13])
-                            .AddProperty("LmPackageName", eventProperties[14])
-                            .AddProperty("KeyLength", eventProperties[15])
-                            .AddProperty("ProcessId", eventProperties[16])
-                            .AddProperty("ProcessName", eventProperties[17])
-                            .AddProperty("IpAddress", eventProperties[18])
-                            .AddProperty("IpPort", eventProperties[19])
-                            .AddProperty("ImpersonationLevel", eventProperties[20])
-                            .Add(
-                                "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
+                        .AddProperty("InstanceId", entry.InstanceId)
+                        .AddProperty("EventTime", entry.TimeGenerated)
+                        .AddProperty("Source", entry.Source)
+                        .AddProperty("Category", entry.CategoryNumber)
+                        .AddProperty("EventLogName", logName)
+                        .AddProperty("EventRecordID", entry.Index)
+                        .AddProperty("Details", entry.Message)
+                        .AddProperty("SubjectUserSid", eventProperties[0])
+                        .AddProperty("SubjectUserName", eventProperties[1])
+                        .AddProperty("SubjectDomainName", eventProperties[2])
+                        .AddProperty("SubjectLogonId", eventProperties[3])
+                        .AddProperty("TargetUserSid", eventProperties[4])
+                        .AddProperty("TargetUserName", eventProperties[5])
+                        .AddProperty("TargetDomainName", eventProperties[6])
+                        .AddProperty("TargetLogonId", eventProperties[7])
+                        .AddProperty("LogonType", eventProperties[8])
+                        .AddProperty("LogonProcessName", eventProperties[9])
+                        .AddProperty("AuthenticationPackageName", eventProperties[10])
+                        .AddProperty("WorkstationName", eventProperties[11])
+                        .AddProperty("LogonGuid", eventProperties[12])
+                        .AddProperty("TransmittedServices", eventProperties[13])
+                        .AddProperty("LmPackageName", eventProperties[14])
+                        .AddProperty("KeyLength", eventProperties[15])
+                        .AddProperty("ProcessId", eventProperties[16])
+                        .AddProperty("ProcessName", eventProperties[17])
+                        .AddProperty("IpAddress", eventProperties[18])
+                        .AddProperty("IpPort", eventProperties[19])
+                        .AddProperty("ImpersonationLevel", eventProperties[20])
+                        .Add(
+                            "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
                 }
             }
             catch (Exception ex)
             {
                 Log.Exception(ex).Add("Error parsing event: {Message:l}", ex.Message);
             }
+        }
+
+        public static bool IsNotValid(IList<object> eventProperties)
+        {
+            //Only interactive users are of interest - logonType 2 and 10. Some non-interactive services can launch processes with logontype 2 but can be filtered.
+            return (uint) eventProperties[8] != 2 && (uint) eventProperties[8] != 10 ||
+                   (string) eventProperties[18] == "-" ||
+                   eventProperties[12].ToString() == "00000000-0000-0000-0000-000000000000";
         }
     }
 }
