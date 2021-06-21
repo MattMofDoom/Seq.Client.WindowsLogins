@@ -16,6 +16,9 @@ namespace Seq.Client.WindowsLogins
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
+        private const int Available = 0;
+        private const int Locked = 1;
+        private static int _heartbeatLockState;
 
         public void Start(bool isInteractive)
         {
@@ -44,16 +47,16 @@ namespace Seq.Client.WindowsLogins
 
         private static void EventListStatus(object sender, EventArgs e)
         {
-            if (_eventListTimer.AutoReset == false)
-            {
-                //Set the timer to 10 minutes after initial heartbeat
-                _eventListTimer.AutoReset = true;
-                _eventListTimer.Interval = Config.HeartbeatInterval;
-                _eventListTimer.Start();
-            }
+            Log.Level(LurgLevel.Debug)
+                .AddProperty("ItemCount", _eventList.Count)
+                .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
+                .Add("{AppName:l} Heartbeat [{MachineName:l}] - Cache of timed event ids is at {ItemCount} items, Next Heartbeat at ~{NextTime:H:mm:ss tt}");
 
-            Log.Level(LurgLevel.Debug).Add("{AppName} Heartbeat - Cache of timed event ids is at {ItemCount} items",
-                Logging.Config.AppName, _eventList.Count);
+            if (_eventListTimer.AutoReset) return;
+            //Set the timer to 10 minutes after initial heartbeat
+            _eventListTimer.AutoReset = true;
+            _eventListTimer.Interval = Config.HeartbeatInterval;
+            _eventListTimer.Start();
         }
 
         private static EventLog OpenEventLog()
