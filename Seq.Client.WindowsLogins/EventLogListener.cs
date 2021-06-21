@@ -106,7 +106,8 @@ namespace Seq.Client.WindowsLogins
             try
             {
                 //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
-                if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 60 &&
+                if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 600 &&
+                    args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventBagHasEvent(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
@@ -120,10 +121,6 @@ namespace Seq.Client.WindowsLogins
         {
             //Ensure that we track events we've already seen
             EventList.Add(entry.Index);
-
-            //This listener is only interested in successful logins
-            if (entry.EntryType != EventLogEntryType.SuccessAudit || (ushort) entry.InstanceId != 4624)
-                return;
 
             try
             {

@@ -4,7 +4,6 @@ This is a fork of the [Seq.Client.EventLog](https://github.com/c0shea/Seq.Client
 
 This substantially modifies the client to a service that looks for successful interactive user logins and raises a nicely formatted event with the data extracted as structured properties.
 
-
 ## Get Started
 
 1. [Download the latest release](https://github.com/MattMofDoom/Seq.Client.WindowsLogins/releases) of Seq.Client.WindowsLogins.

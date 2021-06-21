@@ -5,12 +5,12 @@ VisualStudioVersion = 16.0.31402.337
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{32DED70B-174F-4C3F-BC48-B776AB83C1BE}"
 	ProjectSection(SolutionItems) = preProject
-		..\README.md = ..\README.md
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Seq.Client.WindowsLogins", "Seq.Client.WindowsLogins\Seq.Client.WindowsLogins.csproj", "{B14232BD-B051-4255-9DEC-81EA174660E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Seq.Client.WindowsLogins.Tests", "Seq.Client.WindowsLogins.Tests\Seq.Client.WindowsLogins.Tests.csproj", "{8AB5531E-2A20-42EB-B021-D4CE694C3D2D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Seq.Client.WindowsLogins.Tests", "Seq.Client.WindowsLogins.Tests\Seq.Client.WindowsLogins.Tests.csproj", "{8AB5531E-2A20-42EB-B021-D4CE694C3D2D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
