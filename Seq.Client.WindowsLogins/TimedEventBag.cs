@@ -1,181 +1,39 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Timers;
+using System.Runtime.Caching;
 
 // ReSharper disable UnusedMember.Global
 
 namespace Seq.Client.WindowsLogins
 {
-    public class TimedEventBag : IList<int>
+    public class TimedEventBag
     {
-        private static readonly object Lock = new object();
-        private readonly Timer _timer;
-        private volatile List<Tuple<DateTime, int>> _collection = new List<Tuple<DateTime, int>>();
+        private readonly ObjectCache _cache;
+        private readonly int _expiration;
 
         /// <summary>
-        ///     Define a list that automatically remove expired objects.
+        ///     Cache objects that have already been seen, and expire them after X seconds
         /// </summary>
-        /// <param name="interval"></param>
-        /// The interval at which the list test for old objects.
         /// <param name="expiration"></param>
-        /// The TimeSpan an object stay valid inside the list.
-        public TimedEventBag(int interval, TimeSpan expiration)
+        public TimedEventBag(int expiration)
         {
-            _timer = new Timer {Interval = interval};
-            _timer.Elapsed += Tick;
-            _timer.AutoReset = true;
-            _timer.Start();
-
-            Expiration = expiration;
-        }
-
-        public int Interval
-        {
-            get => (int) _timer.Interval;
-            set => _timer.Interval = value;
-        }
-
-        private TimeSpan Expiration { get; }
-
-        private void Tick(object sender, EventArgs e)
-        {
-            lock (Lock)
-            {
-                for (var i = _collection.Count - 1; i >= 0; i--)
-                    lock (Lock)
-                    {
-                        if (DateTime.Now - _collection[i].Item1 < Expiration) continue;
-                        _collection.RemoveAt(i);
-                    }
-            }
-        }
-
-        #region IList Implementation
-
-        public int this[int index]
-        {
-            get
-            {
-                lock (Lock)
-                {
-                    return _collection[index].Item2;
-                }
-            }
-            set
-            {
-                lock (Lock)
-                {
-                    _collection[index] = new Tuple<DateTime, int>(DateTime.Now, value);
-                }
-            }
-        }
-
-        public IEnumerator<int> GetEnumerator()
-        {
-            lock (Lock)
-            {
-                return _collection.Select(x => x.Item2).GetEnumerator();
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            lock (Lock)
-            {
-                return _collection.Select(x => x.Item2).GetEnumerator();
-            }
+            _expiration = expiration >= 0 ? expiration : 600;
+            _cache = MemoryCache.Default;
         }
 
         public void Add(int item)
         {
-            lock (Lock)
-            {
-                _collection.Add(new Tuple<DateTime, int>(DateTime.Now, item));
-            }
-        }
-
-        public int Count
-        {
-            get
-            {
-                lock (Lock)
-                {
-                    return _collection.Count;
-                }
-            }
-        }
-
-        public bool IsSynchronized => false;
-
-        public bool IsReadOnly => false;
-
-        public void CopyTo(int[] array, int index)
-        {
-            lock (Lock)
-            {
-                for (var i = 0; i < _collection.Count; i++)
-                    array[i + index] = _collection[i].Item2;
-            }
-        }
-
-        public bool Remove(int item)
-        {
-            lock (Lock)
-            {
-                var contained = Contains(item);
-                for (var i = _collection.Count - 1; i >= 0; i--)
-                    if (_collection[i].Item2 == item)
-                        _collection.RemoveAt(i);
-                return contained;
-            }
-        }
-
-        public void RemoveAt(int i)
-        {
-            lock (Lock)
-            {
-                _collection.RemoveAt(i);
-            }
+            _cache.Add(new CacheItem(item.ToString(), item),
+                new CacheItemPolicy {AbsoluteExpiration = DateTimeOffset.Now.AddSeconds(_expiration)});
         }
 
         public bool Contains(int item)
         {
-            lock (Lock)
-            {
-                return _collection.Any(t => t.Item2 == item);
-            }
+            return _cache.Contains(item.ToString());
         }
 
-        public void Insert(int index, int item)
+        public long Count()
         {
-            lock (Lock)
-            {
-                _collection.Insert(index, new Tuple<DateTime, int>(DateTime.Now, item));
-            }
+            return _cache.GetCount();
         }
-
-        public int IndexOf(int item)
-        {
-            lock (Lock)
-            {
-                for (var i = 0; i < _collection.Count; i++)
-                    if (_collection[i].Item2 == item)
-                        return i;
-
-                return -1;
-            }
-        }
-
-        public void Clear()
-        {
-            lock (Lock)
-            {
-                _collection.Clear();
-            }
-        }
-
-        #endregion
     }
 }

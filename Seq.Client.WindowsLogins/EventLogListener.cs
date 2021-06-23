@@ -15,21 +15,16 @@ namespace Seq.Client.WindowsLogins
         private EventLog _eventLog;
         private volatile bool _started;
 
-        public EventLogListener(int? eventListInterval = null, TimeSpan? expiry = null)
+        public EventLogListener(int? expiry = null)
         {
-            TimeSpan eventExpiryTime;
-            int eventListInterval1;
-            if (eventListInterval != null)
-                eventListInterval1 = (int) eventListInterval;
-            else
-                eventListInterval1 = 60000;
+            int eventExpiryTime;
 
             if (expiry != null)
-                eventExpiryTime = (TimeSpan) expiry;
+                eventExpiryTime = (int) expiry;
             else
-                eventExpiryTime = new TimeSpan(0, 10, 0);
+                eventExpiryTime = 600;
 
-            EventList = new TimedEventBag(eventListInterval1, eventExpiryTime);
+            EventList = new TimedEventBag(eventExpiryTime);
         }
 
         // ReSharper disable once FieldCanBeMadeReadOnly.Local
@@ -63,7 +58,7 @@ namespace Seq.Client.WindowsLogins
         private static void ServiceHeartbeat(object sender, EventArgs e)
         {
             Log.Level(LurgLevel.Debug)
-                .AddProperty("ItemCount", EventList.Count)
+                .AddProperty("ItemCount", EventList.Count())
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
                 .Add(
                     "{AppName:l} Heartbeat [{MachineName:l}] - Cache of timed event ids is at {ItemCount} items, Next Heartbeat at {NextTime:H:mm:ss tt}");
@@ -108,7 +103,7 @@ namespace Seq.Client.WindowsLogins
                 //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
                 if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 600 &&
                     args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
-                    !EventBagHasEvent(args.Entry.Index))
+                    !EventList.Contains(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
             catch (Exception ex)
@@ -208,11 +203,6 @@ namespace Seq.Client.WindowsLogins
             return (uint) eventProperties[8] != 2 && (uint) eventProperties[8] != 10 ||
                    (string) eventProperties[18] == "-" ||
                    eventProperties[12].ToString() == "00000000-0000-0000-0000-000000000000";
-        }
-
-        public static bool EventBagHasEvent(int index)
-        {
-            return EventList.Contains(index);
         }
     }
 }
