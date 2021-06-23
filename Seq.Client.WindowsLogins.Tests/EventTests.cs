@@ -17,7 +17,7 @@ namespace Seq.Client.WindowsLogins.Tests
         }
 
         /// <summary>
-        /// Ensure valid properties will be passed
+        ///     Ensure valid properties will be passed
         /// </summary>
         [Fact]
         public void EvaluatesValidEvent()
@@ -36,7 +36,7 @@ namespace Seq.Client.WindowsLogins.Tests
         }
 
         /// <summary>
-        /// Ensure invalid properties won't be passed
+        ///     Ensure invalid properties won't be passed
         /// </summary>
         [Fact]
         public void EvaluatesInvalidEvent()

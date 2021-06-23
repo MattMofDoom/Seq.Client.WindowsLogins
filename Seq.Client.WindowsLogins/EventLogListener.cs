@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
+using System.Threading.Tasks;
 using Lurgle.Logging;
 using Timer = System.Timers.Timer;
 
@@ -96,15 +97,15 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private void OnEntryWritten(object sender, EntryWrittenEventArgs args)
+        private async void OnEntryWritten(object sender, EntryWrittenEventArgs args)
         {
             try
             {
-                //Ensure that events are new and have not been seen already. This addresses a scenario where large event logs can repeatedly pass events to the handler.
+                //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
                 if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 600 &&
                     args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventList.Contains(args.Entry.Index))
-                    HandleEventLogEntry(args.Entry, _eventLog.Log);
+                    await HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
             catch (Exception ex)
             {
@@ -112,7 +113,7 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private static void HandleEventLogEntry(EventLogEntry entry, string logName)
+        private static async Task HandleEventLogEntry(EventLogEntry entry, string logName)
         {
             //Ensure that we track events we've already seen
             EventList.Add(entry.Index);
@@ -155,7 +156,7 @@ namespace Seq.Client.WindowsLogins
 
                     if (IsNotValid(eventProperties)) continue;
 
-                    Log.Level(Extensions.MapLogLevel(entry.EntryType))
+                    await Task.Run(() => Log.Level(Extensions.MapLogLevel(entry.EntryType))
 #pragma warning disable 618
                         .AddProperty("EventId", entry.EventID)
 #pragma warning restore 618
@@ -188,7 +189,7 @@ namespace Seq.Client.WindowsLogins
                         .AddProperty("IpPort", eventProperties[19])
                         .AddProperty("ImpersonationLevel", eventProperties[20])
                         .Add(
-                            "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
+                            "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}"));
                 }
             }
             catch (Exception ex)
