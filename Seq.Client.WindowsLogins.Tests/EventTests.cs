@@ -55,7 +55,7 @@ namespace Seq.Client.WindowsLogins.Tests
         }
 
         /// <summary>
-        ///     A 3 second test to ensure a single event expires after 2 seconds
+        ///     Allow a single event to expire after 2 seconds
         /// </summary>
         [Fact]
         public void EventBagExpiresEvent()
@@ -68,10 +68,37 @@ namespace Seq.Client.WindowsLogins.Tests
         }
 
         /// <summary>
+        ///     A longer test that ensures an event is kept while it is accessed
+        /// </summary>
+        [Fact]
+        public void EventBagKeepsAccessedEvent()
+        {
+            var unused = new EventLogListener(2);
+            var watch = new Stopwatch();
+            watch.Start();
+
+            EventLogListener.EventList.Add(1000);
+
+            for (var i = 1; i < 2001; i++)
+            {
+                var count = EventLogListener.EventList.Count();
+                if (i % 100 == 0)
+                    _testOutputHelper.WriteLine(
+                        $"Loop {i} @ {watch.ElapsedMilliseconds / 1000:N0} seconds, Bag Count: {count}");
+
+                Assert.True(EventLogListener.EventList.Contains(1000));
+                Thread.Sleep(10);
+            }
+
+            Thread.Sleep(3000);
+            Assert.False(EventLogListener.EventList.Contains(1000));
+        }
+
+        /// <summary>
         ///     A long test (60 seconds) that allows us to observe cache population and expiry
         /// </summary>
         [Fact]
-        public void EventBagConcurrentPopulationAndExpiry()
+        public void EventBagPopulationAndExpiry()
         {
             var unused = new EventLogListener(2);
             var watch = new Stopwatch();

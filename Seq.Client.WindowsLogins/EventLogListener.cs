@@ -14,9 +14,11 @@ namespace Seq.Client.WindowsLogins
         private static Timer _heartbeatTimer;
         private static DateTime _lastEvent = DateTime.Now;
         private static DateTime _lastReset = DateTime.Now;
+        private static DateTime _logWindowStart = DateTime.Now;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
+        private static int _unhandledEvents = 0;
 
         public EventLogListener(int? expiry = null)
         {
@@ -65,12 +67,19 @@ namespace Seq.Client.WindowsLogins
         private void EventWatchdog(object sender, EventArgs e)
         {
             var lastLog = (DateTime.Now - _lastEvent).TotalSeconds;
-            if (!(lastLog > 59) || !((DateTime.Now - _lastReset).TotalSeconds > 59)) return;
+
+            //Keep the event log listener rolling forward
+            if ((DateTime.Now - _logWindowStart).TotalHours >= 1)
+                _logWindowStart = DateTime.Now;
+
+            if (!(lastLog >= 600) || !((DateTime.Now - _lastReset).TotalSeconds >= 600)) return;
             _lastReset = DateTime.Now;
             Log.Level(LurgLevel.Debug)
                 .AddProperty("TotalSeconds", lastLog)
-                .Add("{AppName:l} has not received entries for {TotalSeconds} seconds, resetting ...");
+                .Add("{AppName:l} has not received entries for {TotalSeconds:N0} seconds, resetting ...");
 
+            _eventLog.Close();
+            _eventLog.Dispose();
             _eventLog = OpenEventLog();
             _eventLog.EntryWritten += OnEntryWritten;
             _eventLog.EnableRaisingEvents = true;
@@ -80,9 +89,11 @@ namespace Seq.Client.WindowsLogins
         {
             Log.Level(LurgLevel.Debug)
                 .AddProperty("ItemCount", EventList.Count())
+                .AddProperty("UnhandledEvents", _unhandledEvents)
+                .AddProperty("LogWindowStart", _logWindowStart)
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
                 .Add(
-                    "{AppName:l} Heartbeat [{MachineName:l}] - Cache of timed event ids is at {ItemCount} items, Next Heartbeat at {NextTime:H:mm:ss tt}");
+                    "{AppName:l} Heartbeat [{MachineName:l}] - Event cache: {ItemCount}, Unhandled events: {UnhandledEvents}, Next Heartbeat: {NextTime:H:mm:ss tt}");
 
             if (_heartbeatTimer.AutoReset) return;
             //Set the timer to 10 minutes after initial heartbeat
@@ -122,8 +133,9 @@ namespace Seq.Client.WindowsLogins
             try
             {
                 _lastEvent = DateTime.Now;
+
                 //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
-                if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 600 &&
+                if (args.Entry.TimeGenerated >= _logWindowStart &&
                     args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventList.Contains(args.Entry.Index))
                     HandleEventLogEntry(args.Entry, _eventLog.Log);
@@ -175,7 +187,11 @@ namespace Seq.Client.WindowsLogins
 
                     var eventProperties = ((EventLogRecord) logEntry).GetPropertyValues(loginEventPropertySelector);
 
-                    if (IsNotValid(eventProperties)) continue;
+                    if (eventProperties.Count != 21)
+                        _unhandledEvents++;
+
+                    if (IsNotValid(eventProperties))
+                        continue;
 
                     Log.Level(Extensions.MapLogLevel(entry.EntryType))
 #pragma warning disable 618

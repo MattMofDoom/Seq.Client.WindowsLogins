@@ -8,7 +8,7 @@ namespace Seq.Client.WindowsLogins
     public class TimedEventBag
     {
         private readonly ObjectCache _cache;
-        private readonly int _expiration;
+        private readonly CacheItemPolicy _cachePolicy;
 
         /// <summary>
         ///     Cache objects that have already been seen, and expire them after X seconds
@@ -16,14 +16,14 @@ namespace Seq.Client.WindowsLogins
         /// <param name="expiration"></param>
         public TimedEventBag(int expiration)
         {
-            _expiration = expiration >= 0 ? expiration : 600;
+            expiration = expiration >= 0 ? expiration : 600;
             _cache = MemoryCache.Default;
+            _cachePolicy = new CacheItemPolicy {SlidingExpiration = TimeSpan.FromSeconds(expiration)};
         }
 
         public void Add(int item)
         {
-            _cache.Add(new CacheItem(item.ToString(), item),
-                new CacheItemPolicy {AbsoluteExpiration = DateTimeOffset.Now.AddSeconds(_expiration)});
+            _cache.Add(new CacheItem(item.ToString(), item), _cachePolicy);
         }
 
         public bool Contains(int item)
