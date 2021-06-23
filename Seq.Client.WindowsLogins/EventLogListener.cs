@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
-using System.Threading.Tasks;
 using Lurgle.Logging;
 using Timer = System.Timers.Timer;
 
@@ -11,7 +10,10 @@ namespace Seq.Client.WindowsLogins
 {
     public class EventLogListener
     {
+        private static Timer _watchdogTimer;
         private static Timer _heartbeatTimer;
+        private static DateTime _lastEvent = DateTime.Now;
+        private static DateTime _lastReset = DateTime.Now;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
@@ -42,6 +44,10 @@ namespace Seq.Client.WindowsLogins
                 _eventLog.EnableRaisingEvents = true;
                 _started = true;
 
+                _watchdogTimer = new Timer {Interval = 1000, AutoReset = true};
+                _watchdogTimer.Elapsed += EventWatchdog;
+                _watchdogTimer.Start();
+
                 //Heartbeat timer that can be used to detect if the service is not running
                 if (isInteractive || Config.HeartbeatInterval <= 0) return;
                 //First heartbeat will be at a random interval between 2 and 10 seconds
@@ -54,6 +60,20 @@ namespace Seq.Client.WindowsLogins
             {
                 Log.Exception(ex).Add("Failed to start listener: {Message:l}", ex.Message);
             }
+        }
+
+        private void EventWatchdog(object sender, EventArgs e)
+        {
+            var lastLog = (DateTime.Now - _lastEvent).TotalSeconds;
+            if (!(lastLog > 59) || !((DateTime.Now - _lastReset).TotalSeconds > 59)) return;
+            _lastReset = DateTime.Now;
+            Log.Level(LurgLevel.Debug)
+                .AddProperty("TotalSeconds", lastLog)
+                .Add("{AppName:l} has not received entries for {TotalSeconds} seconds, resetting ...");
+
+            _eventLog = OpenEventLog();
+            _eventLog.EntryWritten += OnEntryWritten;
+            _eventLog.EnableRaisingEvents = true;
         }
 
         private static void ServiceHeartbeat(object sender, EventArgs e)
@@ -97,15 +117,16 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private async void OnEntryWritten(object sender, EntryWrittenEventArgs args)
+        private void OnEntryWritten(object sender, EntryWrittenEventArgs args)
         {
             try
             {
+                _lastEvent = DateTime.Now;
                 //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
                 if ((DateTime.Now - args.Entry.TimeGenerated).TotalSeconds < 600 &&
                     args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventList.Contains(args.Entry.Index))
-                    await HandleEventLogEntry(args.Entry, _eventLog.Log);
+                    HandleEventLogEntry(args.Entry, _eventLog.Log);
             }
             catch (Exception ex)
             {
@@ -113,7 +134,7 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private static async Task HandleEventLogEntry(EventLogEntry entry, string logName)
+        private static void HandleEventLogEntry(EventLogEntry entry, string logName)
         {
             //Ensure that we track events we've already seen
             EventList.Add(entry.Index);
@@ -156,7 +177,7 @@ namespace Seq.Client.WindowsLogins
 
                     if (IsNotValid(eventProperties)) continue;
 
-                    await Task.Run(() => Log.Level(Extensions.MapLogLevel(entry.EntryType))
+                    Log.Level(Extensions.MapLogLevel(entry.EntryType))
 #pragma warning disable 618
                         .AddProperty("EventId", entry.EventID)
 #pragma warning restore 618
@@ -189,7 +210,7 @@ namespace Seq.Client.WindowsLogins
                         .AddProperty("IpPort", eventProperties[19])
                         .AddProperty("ImpersonationLevel", eventProperties[20])
                         .Add(
-                            "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}"));
+                            "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
                 }
             }
             catch (Exception ex)
