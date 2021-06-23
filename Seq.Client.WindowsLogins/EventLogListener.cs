@@ -46,7 +46,7 @@ namespace Seq.Client.WindowsLogins
                 _eventLog.EnableRaisingEvents = true;
                 _started = true;
 
-                _watchdogTimer = new Timer {Interval = 1000, AutoReset = true};
+                _watchdogTimer = new Timer {Interval = 10000, AutoReset = true};
                 _watchdogTimer.Elapsed += EventWatchdog;
                 _watchdogTimer.Start();
 
@@ -69,8 +69,8 @@ namespace Seq.Client.WindowsLogins
             var lastLog = (DateTime.Now - _lastEvent).TotalSeconds;
 
             //Keep the event log listener rolling forward
-            if ((DateTime.Now - _logWindowStart).TotalHours >= 1)
-                _logWindowStart = DateTime.Now;
+            if ((DateTime.Now - _logWindowStart).TotalHours > 1)
+                _logWindowStart = (DateTime.Now).AddHours(-1);
 
             if (!(lastLog >= 600) || !((DateTime.Now - _lastReset).TotalSeconds >= 600)) return;
             _lastReset = DateTime.Now;
