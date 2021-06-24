@@ -14,14 +14,16 @@ namespace Seq.Client.WindowsLogins
     {
         private static bool _isInteractive;
         private static Timer _heartbeatTimer;
-        private static readonly DateTime _serviceStart = DateTime.Now;
-        private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
-        private EventLogQuery _eventLog;
-        private EventLogWatcher _watcher;
-        private volatile bool _started;
+        private static readonly DateTime ServiceStart = DateTime.Now;
+        private static long _logonsDetected;
+        private static long _nonInteractiveLogons;
         private static long _unhandledEvents;
         private static long _oldEvents;
         private static long _emptyEvents;
+        private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
+        private EventLogQuery _eventLog;
+        private volatile bool _started;
+        private EventLogWatcher _watcher;
 
         public EventLogListener(int? expiry = null)
         {
@@ -57,7 +59,9 @@ namespace Seq.Client.WindowsLogins
                 //Heartbeat timer that can be used to detect if the service is not running
                 if (Config.HeartbeatInterval <= 0) return;
                 //First heartbeat will be at a random interval between 2 and 10 seconds
-                _heartbeatTimer = isInteractive ? new Timer {Interval = 10000} : new Timer {Interval = new Random().Next(2000, 10000)};
+                _heartbeatTimer = isInteractive
+                    ? new Timer {Interval = 10000}
+                    : new Timer {Interval = new Random().Next(2000, 10000)};
                 _heartbeatTimer.Elapsed += ServiceHeartbeat;
                 _heartbeatTimer.AutoReset = false;
                 _heartbeatTimer.Start();
@@ -72,13 +76,17 @@ namespace Seq.Client.WindowsLogins
         {
             Log.Level(LurgLevel.Debug)
                 .AddProperty("ItemCount", EventList.Count)
+                .AddProperty("LogonsDetected", _logonsDetected)
+                .AddProperty("NonInteractiveLogons", _nonInteractiveLogons)
                 .AddProperty("OldEvents", _oldEvents)
                 .AddProperty("EmptyEvents", _emptyEvents)
                 .AddProperty("UnhandledEvents", _unhandledEvents)
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
                 .Add(
                     Config.IsDebug
-                        ? "{AppName:l} Heartbeat [{MachineName:l}] - Event cache: {ItemCount}, Unhandled events: {UnhandledEvents}, Old events seen: {OldEvents}, Empty events: {EmptyEvents}, Next Heartbeat: {NextTime:H:mm:ss tt}"
+                        ? "{AppName:l} Heartbeat [{MachineName:l}] - Event cache: {ItemCount}, Logons detected: {LogonsDetected}, " +
+                          "Non-interactive logons: {NonInteractiveLogons}, Unhandled events: {UnhandledEvents}, Old events seen: {OldEvents}, " +
+                          "Empty events: {EmptyEvents}, Next Heartbeat: {NextTime:H:mm:ss tt}"
                         : "{AppName:l} Heartbeat [{MachineName:l}] - Event cache: {ItemCount}, Next Heartbeat: {NextTime:H:mm:ss tt}");
 
             if (_heartbeatTimer.AutoReset) return;
@@ -112,9 +120,10 @@ namespace Seq.Client.WindowsLogins
             try
             {
                 //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
-                if (args.EventRecord != null && args.EventRecord.TimeCreated >= _serviceStart && !EventList.Contains(args.EventRecord.RecordId))
+                if (args.EventRecord != null && args.EventRecord.TimeCreated >= ServiceStart &&
+                    !EventList.Contains(args.EventRecord.RecordId))
                     await Task.Run(() => HandleEventLogEntry(args.EventRecord));
-                else if (args.EventRecord != null && args.EventRecord.TimeCreated < _serviceStart)
+                else if (args.EventRecord != null && args.EventRecord.TimeCreated < ServiceStart)
                     _oldEvents++;
                 else if (args.EventRecord == null)
                     _emptyEvents++;
@@ -161,10 +170,18 @@ namespace Seq.Client.WindowsLogins
                 var eventProperties = ((EventLogRecord) entry).GetPropertyValues(loginEventPropertySelector);
 
                 if (eventProperties.Count != 21)
+                {
                     _unhandledEvents++;
+                    return;
+                }
 
                 if (IsNotValid(eventProperties))
+                {
+                    _nonInteractiveLogons++;
                     return;
+                }
+
+                _logonsDetected++;
 
                 Log.Level(Extensions.MapLogLevel(EventLogEntryType.SuccessAudit))
 #pragma warning disable 618
