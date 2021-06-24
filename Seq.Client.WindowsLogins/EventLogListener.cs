@@ -15,6 +15,7 @@ namespace Seq.Client.WindowsLogins
         private static Timer _heartbeatTimer;
         private static DateTime _lastEvent = DateTime.Now;
         private static DateTime _lastReset = DateTime.Now;
+        private static DateTime _serviceStart = DateTime.Now;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
@@ -130,7 +131,7 @@ namespace Seq.Client.WindowsLogins
                 _lastEvent = DateTime.Now;
 
                 //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
-                if (args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
+                if (args.Entry.TimeGenerated >= _serviceStart && args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventList.Contains(args.Entry.Index))
                     await Task.Run(() => HandleEventLogEntry(args.Entry, _eventLog.Log));
             }
