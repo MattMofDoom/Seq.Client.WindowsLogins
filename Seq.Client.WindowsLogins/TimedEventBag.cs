@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Runtime.Caching;
+using Microsoft.Extensions.Caching.Memory;
 
 // ReSharper disable UnusedMember.Global
 
@@ -7,8 +7,9 @@ namespace Seq.Client.WindowsLogins
 {
     public class TimedEventBag
     {
-        private readonly ObjectCache _cache;
-        private readonly CacheItemPolicy _cachePolicy;
+        private readonly MemoryCache _cache;
+        private readonly MemoryCacheEntryOptions _cachePolicy;
+        public int Count => _cache.Count;
 
         /// <summary>
         ///     Cache objects that have already been seen, and expire them after X seconds
@@ -17,23 +18,20 @@ namespace Seq.Client.WindowsLogins
         public TimedEventBag(int expiration)
         {
             expiration = expiration >= 0 ? expiration : 600;
-            _cache = MemoryCache.Default;
-            _cachePolicy = new CacheItemPolicy {SlidingExpiration = TimeSpan.FromSeconds(expiration)};
+            _cache = new MemoryCache(new MemoryCacheOptions() {ExpirationScanFrequency = TimeSpan.FromSeconds(1)});
+            _cachePolicy = new MemoryCacheEntryOptions() {SlidingExpiration = TimeSpan.FromSeconds(expiration)};
         }
 
         public void Add(int item)
         {
-            _cache.Add(new CacheItem(item.ToString(), item), _cachePolicy);
+            if (!Contains(item))
+                _cache.Set(item.ToString(), item, _cachePolicy);
         }
 
         public bool Contains(int item)
         {
-            return _cache.Contains(item.ToString());
+            return _cache.TryGetValue(item.ToString(), out _);
         }
 
-        public long Count()
-        {
-            return _cache.GetCount();
-        }
     }
 }

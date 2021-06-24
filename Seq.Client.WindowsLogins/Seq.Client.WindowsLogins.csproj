@@ -65,6 +65,7 @@
   </ItemGroup>-->
   <ItemGroup>
     <PackageReference Include="Lurgle.Logging" Version="1.1.15" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="5.0.0" />
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.1</Version>
     </PackageReference>

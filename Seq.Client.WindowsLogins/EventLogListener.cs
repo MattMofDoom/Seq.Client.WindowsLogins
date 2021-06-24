@@ -85,7 +85,7 @@ namespace Seq.Client.WindowsLogins
         private static void ServiceHeartbeat(object sender, EventArgs e)
         {
             Log.Level(LurgLevel.Debug)
-                .AddProperty("ItemCount", EventList.Count())
+                .AddProperty("ItemCount", EventList.Count)
                 .AddProperty("UnhandledEvents", _unhandledEvents)
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
                 .Add(

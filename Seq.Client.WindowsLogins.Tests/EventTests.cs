@@ -81,7 +81,7 @@ namespace Seq.Client.WindowsLogins.Tests
 
             for (var i = 1; i < 2001; i++)
             {
-                var count = EventLogListener.EventList.Count();
+                var count = EventLogListener.EventList.Count;
                 if (i % 100 == 0)
                     _testOutputHelper.WriteLine(
                         $"Loop {i} @ {watch.ElapsedMilliseconds / 1000:N0} seconds, Bag Count: {count}");
@@ -110,7 +110,7 @@ namespace Seq.Client.WindowsLogins.Tests
                 for (var i = 1; i < 1001; i++)
                 {
                     EventLogListener.EventList.Add(random.Next(1000, 100000));
-                    var tCount = EventLogListener.EventList.Count();
+                    var tCount = EventLogListener.EventList.Count;
                     if (i % 20 == 0)
                         _testOutputHelper.WriteLine(
                             $"Thread loop {i} @ {watch.ElapsedMilliseconds} milliseconds, Bag Count: {tCount}");
@@ -122,7 +122,7 @@ namespace Seq.Client.WindowsLogins.Tests
             for (var x = 1; x < 4001; x++)
             {
                 Thread.Sleep(10);
-                var count = EventLogListener.EventList.Count();
+                var count = EventLogListener.EventList.Count;
                 if (x % 100 == 0)
                     _testOutputHelper.WriteLine(
                         $"Loop {x} @ {watch.ElapsedMilliseconds / 1000:N0} seconds, Bag Count: {count}");
