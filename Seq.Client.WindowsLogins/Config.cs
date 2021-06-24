@@ -14,7 +14,7 @@ namespace Seq.Client.WindowsLogins
             SeqApiKey = ConfigurationManager.AppSettings["LogSeqApiKey"];
             LogFolder = ConfigurationManager.AppSettings["LogFolder"];
             HeartbeatInterval = GetInt(ConfigurationManager.AppSettings["HeartbeatInterval"]);
-
+            IsDebug = GetBool(ConfigurationManager.AppSettings["IsDebug"]);
             //Must be between 0 and 1 hour in seconds
             if (HeartbeatInterval < 0 || HeartbeatInterval > 3600)
                 HeartbeatInterval = 600000;
@@ -59,6 +59,7 @@ namespace Seq.Client.WindowsLogins
         public static string SeqApiKey { get; }
         public static string LogFolder { get; }
         public static int HeartbeatInterval { get; }
+        public static bool IsDebug { get; }
 
         /// <summary>
         ///     Convert the supplied <see cref="object" /> to an <see cref="int" />
@@ -76,6 +77,23 @@ namespace Seq.Client.WindowsLogins
             if (int.TryParse(sourceString, out var destInt)) return destInt;
 
             return -1;
+        }
+
+        /// <summary>
+        ///     Convert the supplied <see cref="object" /> to a <see cref="bool" />
+        ///     <para />
+        ///     This will filter out nulls that could otherwise cause exceptions
+        /// </summary>
+        /// <param name="sourceObject">An object that can be converted to a bool</param>
+        /// <param name="trueIfEmpty">Return true if the object is empty</param>
+        /// <returns></returns>
+        private static bool GetBool(object sourceObject, bool trueIfEmpty = false)
+        {
+            var sourceString = string.Empty;
+
+            if (!Convert.IsDBNull(sourceObject)) sourceString = (string) sourceObject;
+
+            return bool.TryParse(sourceString, out var destBool) ? destBool : trueIfEmpty;
         }
     }
 }

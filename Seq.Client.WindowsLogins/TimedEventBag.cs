@@ -18,19 +18,20 @@ namespace Seq.Client.WindowsLogins
         public TimedEventBag(int expiration)
         {
             expiration = expiration >= 0 ? expiration : 600;
-            _cache = new MemoryCache(new MemoryCacheOptions() {ExpirationScanFrequency = TimeSpan.FromSeconds(1)});
-            _cachePolicy = new MemoryCacheEntryOptions() {SlidingExpiration = TimeSpan.FromSeconds(expiration)};
+            _cache = new MemoryCache(new MemoryCacheOptions {ExpirationScanFrequency = TimeSpan.FromSeconds(1)});
+            _cachePolicy = new MemoryCacheEntryOptions {SlidingExpiration = TimeSpan.FromSeconds(expiration)};
         }
 
-        public void Add(int item)
+        public void Add(long? item)
         {
+            if (item == null) return;
             if (!Contains(item))
-                _cache.Set(item.ToString(), item, _cachePolicy);
+                _cache.Set(((long)item).ToString(), (long)item, _cachePolicy);
         }
 
-        public bool Contains(int item)
+        public bool Contains(long? item)
         {
-            return _cache.TryGetValue(item.ToString(), out _);
+            return item != null && _cache.TryGetValue(((long)item).ToString(), out _);
         }
 
     }
