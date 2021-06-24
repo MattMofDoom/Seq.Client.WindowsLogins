@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Threading;
+using System.Threading.Tasks;
 using Lurgle.Logging;
 using Timer = System.Timers.Timer;
 
@@ -14,7 +15,6 @@ namespace Seq.Client.WindowsLogins
         private static Timer _heartbeatTimer;
         private static DateTime _lastEvent = DateTime.Now;
         private static DateTime _lastReset = DateTime.Now;
-        private static DateTime _logWindowStart = DateTime.Now;
         private readonly CancellationTokenSource _cancel = new CancellationTokenSource();
         private EventLog _eventLog;
         private volatile bool _started;
@@ -68,10 +68,6 @@ namespace Seq.Client.WindowsLogins
         {
             var lastLog = (DateTime.Now - _lastEvent).TotalSeconds;
 
-            //Keep the event log listener rolling forward
-            if ((DateTime.Now - _logWindowStart).TotalHours > 1)
-                _logWindowStart = (DateTime.Now).AddHours(-1);
-
             if (!(lastLog >= 600) || !((DateTime.Now - _lastReset).TotalSeconds >= 600)) return;
             _lastReset = DateTime.Now;
             Log.Level(LurgLevel.Debug)
@@ -90,7 +86,6 @@ namespace Seq.Client.WindowsLogins
             Log.Level(LurgLevel.Debug)
                 .AddProperty("ItemCount", EventList.Count())
                 .AddProperty("UnhandledEvents", _unhandledEvents)
-                .AddProperty("LogWindowStart", _logWindowStart)
                 .AddProperty("NextTime", DateTime.Now.AddMilliseconds(Config.HeartbeatInterval))
                 .Add(
                     "{AppName:l} Heartbeat [{MachineName:l}] - Event cache: {ItemCount}, Unhandled events: {UnhandledEvents}, Next Heartbeat: {NextTime:H:mm:ss tt}");
@@ -128,17 +123,16 @@ namespace Seq.Client.WindowsLogins
             }
         }
 
-        private void OnEntryWritten(object sender, EntryWrittenEventArgs args)
+        private async void OnEntryWritten(object sender, EntryWrittenEventArgs args)
         {
             try
             {
                 _lastEvent = DateTime.Now;
 
                 //Ensure that events are new and have not been seen already. This addresses a scenario where event logs can repeatedly pass events to the handler.
-                if (args.Entry.TimeGenerated >= _logWindowStart &&
-                    args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
+                if (args.Entry.EntryType == EventLogEntryType.SuccessAudit && (ushort) args.Entry.InstanceId == 4624 &&
                     !EventList.Contains(args.Entry.Index))
-                    HandleEventLogEntry(args.Entry, _eventLog.Log);
+                    await Task.Run(() => HandleEventLogEntry(args.Entry, _eventLog.Log));
             }
             catch (Exception ex)
             {
