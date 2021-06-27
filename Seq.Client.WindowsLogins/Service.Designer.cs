@@ -31,7 +31,7 @@
             // 
             // Service
             // 
-            this.ServiceName = "Seq.Client.EventLog";
+            this.ServiceName = "Seq.Client.WindowsLogins";
 
         }
 
