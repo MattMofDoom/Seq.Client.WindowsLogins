@@ -1,7 +1,11 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.ServiceModel.Channels;
 
 namespace Seq.Client.WindowsLogins
 {
@@ -15,6 +19,14 @@ namespace Seq.Client.WindowsLogins
             LogFolder = ConfigurationManager.AppSettings["LogFolder"];
             HeartbeatInterval = GetInt(ConfigurationManager.AppSettings["HeartbeatInterval"]);
             IsDebug = GetBool(ConfigurationManager.AppSettings["IsDebug"]);
+            ProjectKey = ConfigurationManager.AppSettings["ProjectKey"];
+            Responders = ConfigurationManager.AppSettings["Responders"];
+            Priority = ConfigurationManager.AppSettings["Priority"];
+            Tags = GetArray(ConfigurationManager.AppSettings["Tags"]);
+            InitialTimeEstimate = ConfigurationManager.AppSettings["InitialTimeEstimate"];
+            RemainingTimeEstimate = ConfigurationManager.AppSettings["RemainingTimeEstimate"];
+            DueDate = ConfigurationManager.AppSettings["DueDate"];
+
             //Must be between 0 and 1 hour in seconds
             if (HeartbeatInterval < 0 || HeartbeatInterval > 3600)
                 HeartbeatInterval = 600000;
@@ -60,6 +72,13 @@ namespace Seq.Client.WindowsLogins
         public static string LogFolder { get; }
         public static int HeartbeatInterval { get; }
         public static bool IsDebug { get; }
+        public static string ProjectKey { get; }
+        public static string Priority { get; }
+        public static string Responders { get; }
+        public static IEnumerable<string> Tags { get; }
+        public static string InitialTimeEstimate { get; }
+        public static string RemainingTimeEstimate { get; }
+        public static string DueDate { get; }
 
         /// <summary>
         ///     Convert the supplied <see cref="object" /> to an <see cref="int" />
@@ -94,6 +113,14 @@ namespace Seq.Client.WindowsLogins
             if (!Convert.IsDBNull(sourceObject)) sourceString = (string) sourceObject;
 
             return bool.TryParse(sourceString, out var destBool) ? destBool : trueIfEmpty;
+        }
+
+        private static IEnumerable<string> GetArray(string value)
+        {
+            return (value ?? "")
+                .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .ToArray();
         }
     }
 }
