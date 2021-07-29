@@ -183,12 +183,22 @@ namespace Seq.Client.WindowsLogins
 
                 _logonsDetected++;
 
+                var eventTimeLong = string.Empty;
+                var eventTimeShort = string.Empty;
+                if (entry.TimeCreated != null)
+                {
+                    eventTimeLong = ((DateTime) entry.TimeCreated).ToString("F");
+                    eventTimeShort = ((DateTime) entry.TimeCreated).ToString("G");
+                }
+
                 Log.Level(Extensions.MapLogLevel(EventLogEntryType.SuccessAudit))
 #pragma warning disable 618
                     .AddProperty("EventId", (long) entry.Id)
 #pragma warning restore 618
                     .AddProperty("InstanceId", entry.Id)
                     .AddProperty("EventTime", entry.TimeCreated)
+                    .AddProperty("EventTimeLong", eventTimeLong)
+                    .AddProperty("EventTimeShort", eventTimeShort)
                     .AddProperty("Source", entry.ProviderName)
                     .AddProperty("Category", entry.LevelDisplayName)
                     .AddProperty("EventLogName", entry.LogName)
@@ -215,8 +225,16 @@ namespace Seq.Client.WindowsLogins
                     .AddProperty("IpAddress", eventProperties[18])
                     .AddProperty("IpPort", eventProperties[19])
                     .AddProperty("ImpersonationLevel", eventProperties[20])
+                    .AddProperty(nameof(Config.ProjectKey), Config.ProjectKey)
+                    .AddProperty(nameof(Config.Priority), Config.Priority)
+                    .AddProperty(nameof(Config.Responders), Config.Responders)
+                    .AddProperty(nameof(Config.Tags), Config.Tags)
+                    .AddProperty(nameof(Config.InitialTimeEstimate), Config.InitialTimeEstimate)
+                    .AddProperty(nameof(Config.RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                    .AddProperty(nameof(Config.DueDate), Config.DueDate)
                     .Add(
                         "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
+
             }
             catch (Exception ex)
             {
