@@ -1,6 +1,6 @@
 # Seq.Client.WindowsLogins
 
-This is a fork of the [Seq.Client.EventLog](https://github.com/c0shea/Seq.Client.EventLog) app for [Seq](https://getseq.net/).
+This Windows service started life as a fork of the [Seq.Client.EventLog](https://github.com/c0shea/Seq.Client.EventLog) app for [Seq](https://getseq.net/), but has diverged quite a long way; nonetheless it absolutely owes DNA to the original.
 
 This substantially modifies the client to a service that looks for successful interactive user logins and raises a nicely formatted event with the data extracted as structured properties.
 
