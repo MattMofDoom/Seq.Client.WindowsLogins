@@ -192,9 +192,8 @@ namespace Seq.Client.WindowsLogins
                 }
 
                 Log.Level(Extensions.MapLogLevel(EventLogEntryType.SuccessAudit))
-#pragma warning disable 618
+                    .SetTimestamp(entry.TimeCreated ?? DateTime.Now)
                     .AddProperty("EventId", (long) entry.Id)
-#pragma warning restore 618
                     .AddProperty("InstanceId", entry.Id)
                     .AddProperty("EventTime", entry.TimeCreated)
                     .AddProperty("EventTimeLong", eventTimeLong)
@@ -234,7 +233,6 @@ namespace Seq.Client.WindowsLogins
                     .AddProperty(nameof(Config.DueDate), Config.DueDate)
                     .Add(
                         "[{AppName:l}] New login detected on {MachineName:l} - {TargetDomainName:l}\\{TargetUserName:l} at {EventTime:F}");
-
             }
             catch (Exception ex)
             {
